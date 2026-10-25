@@ -4,12 +4,12 @@
  let reader=null,video=null,stream=null,detector=null,busy=false,complete=false,last='',lastTime=0;
  const message=(s)=>{el('scan-note').textContent=s;};
  const draw=(res)=>{
-  const state=res.state||'ready'; el('stage').className='stage '+(state==='rejected'?'error':state==='validated'?'success':'');
-  const titles={ready:'READY — SCAN QR',waiting_member:'SCAN QR ANGGOTA',waiting_book:'SCAN QR BUKU',validated:'QR TERVALIDASI',rejected:'SCAN DITOLAK'};
+  const state=res.state||'ready'; el('stage').className='stage '+(state==='rejected'?'error':(state==='validated'||state==='borrowed')?'success':'');
+  const titles={ready:'READY — SCAN QR',waiting_member:'SCAN QR ANGGOTA',waiting_book:'SCAN QR BUKU',validated:'QR TERVALIDASI',borrowed:'PEMINJAMAN BERHASIL',rejected:'SCAN DITOLAK'};
   el('state-title').textContent=titles[state]||state.toUpperCase();
   el('message').textContent=res.message||'';
   el('member').textContent=res.member||'—'; el('book').textContent=res.book||'—';
-  complete=state==='validated'; message(res.message||state);
+  complete=state==='validated'||state==='borrowed'; message(res.message||state);
  };
  async function api(url,body){
   const r=await fetch(url,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json','X-CSRF-TOKEN':cfg.csrf,'Accept':'application/json'},body:JSON.stringify(body)});
@@ -39,5 +39,5 @@
   if('BarcodeDetector'in window){const formats=await BarcodeDetector.getSupportedFormats();if(formats.includes('qr_code')){const b=await createImageBitmap(f);try{const codes=await(new BarcodeDetector({formats:['qr_code']})).detect(b);if(!codes.length)throw Error('QR tidak terdeteksi');await scan(codes[0].rawValue,'photo');return;}finally{b.close();}}}
   await stop();await loadLibrary();const temp=new Html5Qrcode('reader');try{await scan(await temp.scanFile(f,true),'photo');}finally{try{await temp.clear()}catch(e){}}}catch(e){message('Foto gagal: '+e.message)}};
  fetch(cfg.status,{credentials:'same-origin',headers:{Accept:'application/json'}}).then(r=>r.status===401?(location.href='/kiosk/setup',null):r.json()).then(v=>{if(v)draw(v)}).catch(e=>message(e.message));
- setInterval(()=>{if(!busy)fetch(cfg.status,{credentials:'same-origin',headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():null).then(v=>{if(v&&!complete)draw(v)}).catch(()=>{});},5000);
+ setInterval(()=>{if(!busy)fetch(cfg.status,{credentials:'same-origin',headers:{Accept:'application/json'}}).then(r=>r.ok?r.json():null).then(v=>{if(v)draw(v)}).catch(()=>{});},5000);
 })();

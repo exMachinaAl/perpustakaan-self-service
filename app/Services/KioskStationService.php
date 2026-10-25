@@ -22,11 +22,14 @@ final class KioskStationService {
             $book=$b ? $b->judul.' — '.$b->label : null;
         }
         return ['state'=>$state,'member'=>$member,'book'=>$book,'message'=>$message,
-            'validated_only'=>true,'loan_created'=>false,'return_created'=>false];
+            'validated_only'=>$state!=='borrowed','loan_created'=>$state==='borrowed',
+            'return_created'=>false, 'loan_id'=>$row->checkout_loan_id??null,
+            'due_date'=>$row->checkout_due_date??null];
     }
     private function fresh(int $deviceId): object {
         DB::table('library_kiosk_device_sessions')->updateOrInsert(['device_id'=>$deviceId],
-            ['member_id'=>null,'copy_id'=>null,'state'=>'ready','expires_at'=>now()->addSeconds(45),
+            ['member_id'=>null,'copy_id'=>null,'state'=>'ready','validated_event_id'=>null,
+            'checkout_loan_id'=>null,'checkout_due_date'=>null,'expires_at'=>now()->addSeconds(45),
             'updated_at'=>now()]);
         return DB::table('library_kiosk_device_sessions')->where('device_id',$deviceId)->lockForUpdate()->first();
     }
@@ -41,6 +44,10 @@ final class KioskStationService {
         $r=DB::table('library_kiosk_device_sessions')->where('device_id',$deviceId)->first();
         if (!$r || ($r->expires_at && Carbon::parse($r->expires_at)->isPast()))
             return $this->reply('ready',null,'Menunggu QR anggota atau QR buku.');
+        if ($r->state==='borrowed') return $this->reply('borrowed',$r,
+            'PEMINJAMAN BERHASIL. Batas kembali: '.($r->checkout_due_date ?: '-').'.');
+        if ($r->state==='validated') return $this->reply('validated',$r,
+            'QR valid. Untuk pilot, petugas dapat menyetujui transaksi.');
         return $this->reply($r->state,$r,'Sesi aktif.');
     }
     public function scan(int $deviceId, string $payload, string $channel): array {
@@ -49,10 +56,11 @@ final class KioskStationService {
             if (!$dev || !$dev->active) return $this->reply('rejected',null,'Perangkat dinonaktifkan.');
             $r=DB::table('library_kiosk_device_sessions')->where('device_id',$deviceId)->lockForUpdate()->first();
             if (!$r || ($r->expires_at && Carbon::parse($r->expires_at)->isPast())) $r=$this->fresh($deviceId);
-            if ($r->state==='validated') return $this->reply('validated',$r,'QR tervalidasi; reset sesi sebelum pengguna selanjutnya.');
+            if ($r->state==='borrowed') return $this->reply('borrowed',$r,'Peminjaman sudah tercatat. Silakan reset sesi.');
+            if ($r->state==='validated') return $this->reply('validated',$r,'QR tervalidasi. Menunggu proses petugas untuk pilot.');
             $resolved=$this->resolver->resolve($payload,true);
             // Do not store the raw QR payload in any database event.
-            DB::table('library_kiosk_device_events')->insert(['device_id'=>$deviceId,
+            $eventId=DB::table('library_kiosk_device_events')->insertGetId(['device_id'=>$deviceId,
                 'kind'=>$resolved['kind']??'unknown','outcome'=>$resolved['outcome']??'invalid',
                 'member_id'=>$resolved['member_id']??null,'copy_id'=>$resolved['copy_id']??null,'created_at'=>now()]);
             if (($resolved['outcome']??null)!=='identified' || !in_array($resolved['kind']??null,['member','book'],true))
@@ -77,10 +85,12 @@ final class KioskStationService {
             }
             DB::table('library_kiosk_device_sessions')->where('device_id',$deviceId)->update([
                 'member_id'=>$memberId,'copy_id'=>$copyId,'state'=>$state,
+                'validated_event_id'=>$state==='validated'?$eventId:null,
+                'checkout_loan_id'=>null,'checkout_due_date'=>null,
                 'expires_at'=>now()->addSeconds(45),'updated_at'=>now()]);
             $r=DB::table('library_kiosk_device_sessions')->where('device_id',$deviceId)->first();
             $msg=match($state){
-                'validated'=>'QR ASLI TERVALIDASI. Belum membuat transaksi peminjaman.',
+                'validated'=>'QR ASLI TERVALIDASI. Untuk pilot tunggu konfirmasi petugas; belum membuat pinjaman.',
                 'waiting_member'=>'Buku dikenali. Silakan scan QR anggota.',
                 default=>'Anggota dikenali. Silakan scan QR buku.'
             };

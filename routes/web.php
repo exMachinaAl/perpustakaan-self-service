@@ -240,3 +240,10 @@ Route::prefix('kiosk')->group(function () {
     Route::post('/reset', [\App\Http\Controllers\KioskDeviceController::class,'reset'])->middleware('throttle:30,1')->name('kiosk.reset');
     Route::get('/status', [\App\Http\Controllers\KioskDeviceController::class,'status'])->middleware('throttle:120,1')->name('kiosk.status');
 });
+
+// PATCH 009: Only authenticated admin may approve kiosk checkout pilot. Never on public /kiosk.
+Route::middleware(['auth','active','role:admin'])->prefix('admin/kiosk/pilot')->group(function () {
+    Route::get('/', [\App\Http\Controllers\KioskPilotController::class, 'index'])->name('admin.kiosk.pilot');
+    Route::post('/{deviceId}/approve', [\App\Http\Controllers\KioskPilotController::class, 'approve'])
+        ->whereNumber('deviceId')->middleware('throttle:10,1')->name('admin.kiosk.pilot.approve');
+});

@@ -1,0 +1,20 @@
+@echo off
+rem Internal environment resolver; never prints .env or TLS secrets.
+set "RUNTIME_DIR=%~dp0"
+for %%I in ("%~dp0..\..") do set "PROJECT_ROOT=%%~fI"
+if not defined LOCALAPPDATA set "LOCALAPPDATA=%USERPROFILE%\AppData\Local"
+set "TLS_DIR=%LOCALAPPDATA%\Perpustakaan_TLS_LAB"
+set "PHP_EXE="
+if defined PERPUS_PHP_EXE if exist "%PERPUS_PHP_EXE%" set "PHP_EXE=%PERPUS_PHP_EXE%"
+if not defined PHP_EXE if exist "C:\Program Files X\php-8.2.34-nts-Win32-vs16-x64\php.exe" set "PHP_EXE=C:\Program Files X\php-8.2.34-nts-Win32-vs16-x64\php.exe"
+if not defined PHP_EXE if exist "C:\Program Files\php-8.2.35-nts-Win32-vs16-x64\php.exe" set "PHP_EXE=C:\Program Files\php-8.2.35-nts-Win32-vs16-x64\php.exe"
+if not defined PHP_EXE for /f "delims=" %%P in ('where php 2^>nul') do if not defined PHP_EXE set "PHP_EXE=%%P"
+set "CADDY_EXE="
+if defined PERPUS_CADDY_EXE if exist "%PERPUS_CADDY_EXE%" set "CADDY_EXE=%PERPUS_CADDY_EXE%"
+if not defined CADDY_EXE if exist "%TLS_DIR%\bin\caddy.exe" set "CADDY_EXE=%TLS_DIR%\bin\caddy.exe"
+if not defined CADDY_EXE for /f "delims=" %%P in ('where caddy 2^>nul') do if not defined CADDY_EXE set "CADDY_EXE=%%P"
+set "MKCERT_EXE="
+if defined PERPUS_MKCERT_EXE if exist "%PERPUS_MKCERT_EXE%" set "MKCERT_EXE=%PERPUS_MKCERT_EXE%"
+if not defined MKCERT_EXE if exist "%TLS_DIR%\bin\mkcert.exe" set "MKCERT_EXE=%TLS_DIR%\bin\mkcert.exe"
+if not defined MKCERT_EXE for /f "delims=" %%P in ('where mkcert 2^>nul') do if not defined MKCERT_EXE set "MKCERT_EXE=%%P"
+exit /b 0
