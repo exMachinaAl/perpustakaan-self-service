@@ -1,0 +1,1 @@
+<!doctype html><html lang="id"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sesi kedaluwarsa</title></head><body style="font-family:system-ui;text-align:center;padding:60px"><h2>QR kiosk sudah kedaluwarsa atau digunakan</h2><p>Minta QR baru di layar kiosk, lalu scan kembali.</p></body></html>
