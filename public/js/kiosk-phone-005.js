@@ -2,7 +2,7 @@
 (() => {
 const cfg=window.kioskPhone005;let cam=null, busy=false,loader=null;
 const el=id=>document.getElementById(id), message=text=>el('result').textContent=text;
-const sources=cfg.allowCdn?[cfg.jsLocal,'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js','https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js']:[cfg.jsLocal];
+const sources=[cfg.jsLocal];
 async function getLib(){
  if(window.Html5Qrcode)return window.Html5Qrcode;
  if(!loader)loader=(async()=>{
@@ -13,7 +13,7 @@ async function getLib(){
    script.onload=()=>finish(!!window.Html5Qrcode);script.onerror=()=>finish(false);
    script.src=src;document.head.appendChild(script);
   });if(window.Html5Qrcode)return window.Html5Qrcode;}catch(e){}}
-  throw new Error('Decoder QR gagal dimuat. Hubungkan internet atau pasang html5-qrcode.min.js lokal.');
+  throw new Error('Decoder QR lokal gagal dimuat. Hubungi administrator kiosk.');
  })();
  try{return await loader;}catch(e){loader=null;throw e;}
 }

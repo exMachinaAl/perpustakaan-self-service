@@ -28,7 +28,7 @@ async function scan(payload,channel){const raw=String(payload||'').trim();if(!ra
 }
 async function reset(manual=true){try{const r=await post(cfg.reset,{});completed=false;seen.clear();prev='';update(r);if(manual)setNote('Sesi baru siap. Silakan scan QR asli.');}catch(e){setNote('Reset gagal: '+e.message,'bad');}}
 async function status(){try{const r=await fetch(cfg.status,{credentials:'same-origin',headers:{Accept:'application/json'}});if(r.ok)update(await r.json());}catch(e){setNote('Tidak dapat membaca status server.','bad');}}
-const candidates=[cfg.localJs,'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'];
+const candidates=[cfg.localJs];
 async function loadLib(){if(window.Html5Qrcode)return;
  for(const src of candidates){if(!src)continue;try{await new Promise((ok,no)=>{const el=document.createElement('script'),timer=setTimeout(()=>no(Error('Timeout decoder QR')),5500);el.onload=()=>{clearTimeout(timer);window.Html5Qrcode?ok():no(Error('Decoder invalid'));};el.onerror=()=>{clearTimeout(timer);no(Error('Decoder tidak tersedia'));};el.src=src;document.head.appendChild(el)});return;}catch(e){}}
  throw Error('Decoder QR tidak tersedia. Hubungkan ke internet untuk CDN atau gunakan browser BarcodeDetector / scanner USB.');

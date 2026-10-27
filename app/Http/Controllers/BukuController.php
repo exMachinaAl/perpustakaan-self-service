@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Buku;
-use App\Models\Peminjaman;
 use App\Models\ActivityLog;
 use App\Models\AnalyticsLog;
+use App\Models\Buku;
+use App\Models\Peminjaman;
 use App\Models\SearchHistory;
+use App\Services\BookInventory;
+use DomainException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
 
@@ -36,10 +39,10 @@ class BukuController extends Controller
         $buku = Buku::query()
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('judul', 'like', '%' . $search . '%')
-                        ->orWhere('kode', 'like', '%' . $search . '%')
-                        ->orWhere('pengarang', 'like', '%' . $search . '%')
-                        ->orWhere('penerbit', 'like', '%' . $search . '%');
+                    $q->where('judul', 'like', '%'.$search.'%')
+                        ->orWhere('kode', 'like', '%'.$search.'%')
+                        ->orWhere('pengarang', 'like', '%'.$search.'%')
+                        ->orWhere('penerbit', 'like', '%'.$search.'%');
                 });
             })
             ->when($kategori, function ($query) use ($kategori) {
@@ -97,10 +100,12 @@ class BukuController extends Controller
         return view('admin.databuku.create');
     }
 
-    public function store(Request $request)
+    public function store(Request $request, BookInventory $inventory)
     {
         $request->validate([
-            'kode' => 'required',
+            'kode' => 'required|string|max:100|unique:buku,kode',
+            'isbn' => 'nullable|string|max:20',
+            'barcodes' => 'nullable|string|max:5000',
             'judul' => 'required',
             'pengarang' => 'required',
             'penerbit' => 'required',
@@ -118,18 +123,32 @@ class BukuController extends Controller
             $coverPath = $request->file('cover')->store('cover-buku', 'public');
         }
 
-        $buku = Buku::create([
-            'kode' => $request->kode,
-            'judul' => $request->judul,
-            'pengarang' => $request->pengarang,
-            'penerbit' => $request->penerbit,
-            'tahun_terbit' => $request->tahun_terbit,
-            'kategori' => $request->kategori,
-            'stock' => $request->stock,
-            'lokasi' => $request->lokasi,
-            'deskripsi' => $request->deskripsi,
-            'cover' => $coverPath,
-        ]);
+        try {
+            $buku = DB::transaction(function () use ($request, $coverPath, $inventory) {
+                $book = Buku::create([
+                    'kode' => $request->kode,
+                    'isbn' => $request->filled('isbn') ? $inventory->normalizeIsbn($request->isbn) : null,
+                    'judul' => $request->judul,
+                    'pengarang' => $request->pengarang,
+                    'penerbit' => $request->penerbit,
+                    'tahun_terbit' => $request->tahun_terbit,
+                    'kategori' => $request->kategori,
+                    'stock' => $request->stock,
+                    'lokasi' => $request->lokasi,
+                    'deskripsi' => $request->deskripsi,
+                    'cover' => $coverPath,
+                ]);
+                $inventory->assignBarcodes($book, preg_split('/\R+/', (string) $request->barcodes));
+
+                return $book;
+            }, 3);
+        } catch (DomainException $error) {
+            if ($coverPath && Storage::disk('public')->exists($coverPath)) {
+                Storage::disk('public')->delete($coverPath);
+            }
+
+            return back()->withErrors(['barcodes' => $error->getMessage()])->withInput();
+        }
 
         $this->simpanActivityLog('Tambah Buku', 'Admin menambahkan buku baru', [
             'id_buku' => $buku->id_buku,
@@ -170,12 +189,13 @@ class BukuController extends Controller
         return view('admin.databuku.edit', compact('buku'));
     }
 
-    public function update(Request $request, $id_buku)
+    public function update(Request $request, $id_buku, BookInventory $inventory)
     {
         $buku = Buku::findOrFail($id_buku);
 
         $request->validate([
-            'kode' => 'required',
+            'kode' => 'required|string|max:100|unique:buku,kode,'.$buku->id_buku.',id_buku',
+            'isbn' => 'nullable|string|max:20',
             'judul' => 'required',
             'pengarang' => 'required',
             'penerbit' => 'required',
@@ -212,16 +232,18 @@ class BukuController extends Controller
 
         $buku->update([
             'kode' => $request->kode,
+            'isbn' => $request->filled('isbn') ? $inventory->normalizeIsbn($request->isbn) : null,
             'judul' => $request->judul,
             'pengarang' => $request->pengarang,
             'penerbit' => $request->penerbit,
             'tahun_terbit' => $request->tahun_terbit,
             'kategori' => $request->kategori,
-            'stock' => $request->stock,
+            'stock' => $buku->stock,
             'lokasi' => $request->lokasi,
             'deskripsi' => $request->deskripsi,
             'cover' => $coverPath,
         ]);
+        $inventory->syncAvailable($buku, (int) $request->stock);
 
         $this->simpanActivityLog('Update Buku', 'Admin memperbarui data buku', [
             'id_buku' => $buku->id_buku,
@@ -249,7 +271,7 @@ class BukuController extends Controller
     {
         $buku = Buku::findOrFail($id_buku);
         if (Peminjaman::where('id_buku', $buku->id_buku)->exists()) {
-            return back()->with('error','Buku memiliki riwayat transaksi. Tidak dapat dihapus; arsipkan melalui prosedur sekolah.');
+            return back()->with('error', 'Buku memiliki riwayat transaksi. Tidak dapat dihapus; arsipkan melalui prosedur sekolah.');
         }
 
         $dataBuku = [
@@ -304,10 +326,10 @@ class BukuController extends Controller
         $query = Buku::query()
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
-                    $q->where('judul', 'like', '%' . $search . '%')
-                        ->orWhere('kode', 'like', '%' . $search . '%')
-                        ->orWhere('pengarang', 'like', '%' . $search . '%')
-                        ->orWhere('penerbit', 'like', '%' . $search . '%');
+                    $q->where('judul', 'like', '%'.$search.'%')
+                        ->orWhere('kode', 'like', '%'.$search.'%')
+                        ->orWhere('pengarang', 'like', '%'.$search.'%')
+                        ->orWhere('penerbit', 'like', '%'.$search.'%');
                 });
             })
             ->when($kategori && $kategori != 'semua', function ($query) use ($kategori) {
@@ -410,7 +432,7 @@ class BukuController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan ActivityLog Buku: ' . $e->getMessage());
+            Log::error('Gagal menyimpan ActivityLog Buku: '.$e->getMessage());
         }
     }
 
@@ -428,7 +450,7 @@ class BukuController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan AnalyticsLog Buku: ' . $e->getMessage());
+            Log::error('Gagal menyimpan AnalyticsLog Buku: '.$e->getMessage());
         }
     }
 
@@ -446,7 +468,7 @@ class BukuController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan SearchHistory Buku: ' . $e->getMessage());
+            Log::error('Gagal menyimpan SearchHistory Buku: '.$e->getMessage());
         }
     }
 }

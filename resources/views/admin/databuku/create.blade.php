@@ -235,7 +235,7 @@
 
                     <div>
                         <label class="block text-sm font-black text-slate-950 mb-2">
-                            ISBN / Kode Buku
+                            Kode Katalog
                         </label>
 
                         <input name="kode"
@@ -247,6 +247,12 @@
                         @error('kode')
                             <p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>
                         @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-black text-slate-950 mb-2">ISBN / Barcode Penerbit</label>
+                        <input name="isbn" value="{{ old('isbn') }}" class="neo-input w-full px-4 py-3 rounded-xl text-sm" placeholder="Contoh: 9786020000000" type="text">
+                        @error('isbn')<p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>@enderror
                     </div>
 
                     <div>
@@ -267,7 +273,7 @@
 
                     <div>
                         <label class="block text-sm font-black text-slate-950 mb-2">
-                            Jumlah Stok
+                            Jumlah Eksemplar
                         </label>
 
                         <input name="stock"
@@ -279,6 +285,13 @@
                         @error('stock')
                             <p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>
                         @enderror
+                    </div>
+
+                    <div class="md:col-span-2">
+                        <label class="block text-sm font-black text-slate-950 mb-2">Barcode unik eksemplar (opsional, satu per baris)</label>
+                        <textarea name="barcodes" rows="4" class="neo-input w-full px-4 py-3 rounded-xl text-sm" placeholder="INV-0001&#10;INV-0002">{{ old('barcodes') }}</textarea>
+                        <p class="text-xs text-slate-600 mt-1">Jika kosong, sistem tetap membuat QR dan kode inventaris otomatis untuk setiap eksemplar.</p>
+                        @error('barcodes')<p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>@enderror
                     </div>
 
                     <div>

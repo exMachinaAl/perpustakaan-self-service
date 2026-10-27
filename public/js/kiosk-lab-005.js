@@ -1,7 +1,7 @@
 'use strict';
 (() => {
 const cfg=window.kiosk005, el=id=>document.getElementById(id);
-const loaderSources=[cfg.jsLocal,'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js','https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js'];
+const loaderSources=[cfg.jsLocal];
 let libraryLoading=null;
 function tryScript(src){return new Promise((resolve,reject)=>{
  const script=document.createElement('script'); let ended=false;

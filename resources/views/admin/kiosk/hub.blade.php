@@ -46,7 +46,7 @@ small{color:#b0c6e0}#reader{width:100%;min-height:160px;overflow:hidden;border-r
     @if($readiness['active_members']===0)<p class="alert warn">Tidak ada siswa aktif. Langkah scan QR siswa dan simulasi anggota belum bisa dilanjutkan.</p>@endif
    </div>
    <div class="card"><strong>Katalog: {{ $readiness['catalog_books'] }} judul</strong><br>
-    <small>Eksemplar QR aktif: {{ $readiness['copies'] }}. Buku katalog tidak otomatis memiliki QR eksemplar.</small>
+    <small>Eksemplar QR aktif: {{ $readiness['copies'] }}. Buku baru otomatis memperoleh QR sesuai jumlah stok; pengelolaan label tersedia di Data Buku.</small>
     <p><a href="{{ route('admin.databuku.create') }}" target="_blank" rel="noopener">Tambah judul buku ↗</a></p>
     @if($readiness['catalog_books']===0)<p class="alert warn">Belum ada buku di katalog, registrasi QR belum bisa berjalan.</p>
     @elseif($readiness['copies']===0)<p class="alert warn">Belum ada eksemplar QR. Pilih judul pada formulir Registrasi QR Buku di bawah.</p>@endif
@@ -123,6 +123,7 @@ small{color:#b0c6e0}#reader{width:100%;min-height:160px;overflow:hidden;border-r
 <label for="book-select">Buku (harus dipilih sebelum submit)</label><select id="book-select" name="book_id" required><option value="">Pilih judul</option>@foreach($books as $b)
 <option value="{{ $b->id_buku }}">{{ $b->judul }} (stok agregat {{ $b->stock }})</option>@endforeach</select>
 <label style="display:block;margin-top:10px">Label eksemplar</label><input name="label" placeholder="Contoh: BK-FISIKA-001" maxlength="80" required>
+<label style="display:block;margin-top:10px">Barcode lama (opsional)</label><input name="barcode" placeholder="Scan atau ketik barcode unik eksemplar" maxlength="120">
 <button type="submit" style="margin-top:10px">Daftarkan dan Buat QR Buku</button></form>
 <p><small>Belum mengurangi stok atau membuat relasi transaksi eksemplar. Jangan gunakan QR bukti LIBQR1 sebagai label buku.</small></p></div>
 </section>

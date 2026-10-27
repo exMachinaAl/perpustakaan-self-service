@@ -2,11 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\User;
-use App\Models\Prodi;
 use App\Models\ActivityLog;
 use App\Models\AnalyticsLog;
+use App\Models\Prodi;
 use App\Models\SearchHistory;
+use App\Models\User;
+use App\Services\MemberIdentity;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
@@ -40,8 +41,8 @@ class AnggotaController extends Controller
             ->when($search, function ($query) use ($search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('nama', 'like', "%{$search}%")
-                      ->orWhere('nim', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('nim', 'like', "%{$search}%")
+                        ->orWhere('email', 'like', "%{$search}%");
                 });
             })
             ->when($prodiId, function ($query) use ($prodiId) {
@@ -157,6 +158,29 @@ class AnggotaController extends Controller
         return view('admin.anggota.show', compact('anggota'));
     }
 
+    public function card($id, MemberIdentity $identity)
+    {
+        $anggota = User::with('prodi')->where('role', 'user')->findOrFail($id);
+        $payload = $identity->payload($anggota);
+
+        return response()->view('admin.anggota.card', compact('anggota', 'payload'))
+            ->header('Cache-Control', 'private, no-store');
+    }
+
+    public function reissueCard($id, MemberIdentity $identity)
+    {
+        $anggota = User::where('role', 'user')->findOrFail($id);
+        $identity->reissue($anggota);
+        $this->simpanActivityLog('Terbit Ulang Kartu Anggota', 'Admin mengganti QR kartu anggota; kartu lama tidak berlaku.', [
+            'anggota_id' => $anggota->id,
+            'nama' => $anggota->nama,
+            'nim' => $anggota->nim,
+        ]);
+
+        return redirect()->route('admin.anggota.card', $anggota->id)
+            ->with('success', 'Kartu QR baru berhasil diterbitkan. Kartu lama sudah tidak berlaku.');
+    }
+
     public function edit($id)
     {
         $anggota = User::where('role', 'user')->findOrFail($id);
@@ -171,8 +195,8 @@ class AnggotaController extends Controller
 
         $request->validate([
             'nama' => 'required|string|max:255',
-            'nim' => 'required|string|max:50|unique:users,nim,' . $anggota->id,
-            'email' => 'required|email|unique:users,email,' . $anggota->id,
+            'nim' => 'required|string|max:50|unique:users,nim,'.$anggota->id,
+            'email' => 'required|email|unique:users,email,'.$anggota->id,
             'password' => 'nullable|min:10',
             'prodi_id' => 'nullable|exists:prodi,id',
             'status' => 'required|in:aktif,tidak_aktif,diblokir',
@@ -334,7 +358,7 @@ class AnggotaController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan ActivityLog Anggota: ' . $e->getMessage());
+            Log::error('Gagal menyimpan ActivityLog Anggota: '.$e->getMessage());
         }
     }
 
@@ -352,7 +376,7 @@ class AnggotaController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan AnalyticsLog Anggota: ' . $e->getMessage());
+            Log::error('Gagal menyimpan AnalyticsLog Anggota: '.$e->getMessage());
         }
     }
 
@@ -370,7 +394,7 @@ class AnggotaController extends Controller
                 'waktu' => now(),
             ]);
         } catch (\Exception $e) {
-            Log::error('Gagal menyimpan SearchHistory Anggota: ' . $e->getMessage());
+            Log::error('Gagal menyimpan SearchHistory Anggota: '.$e->getMessage());
         }
     }
 }

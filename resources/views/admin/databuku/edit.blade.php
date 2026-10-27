@@ -244,7 +244,7 @@
 
                     <div>
                         <label class="block text-sm font-black text-slate-950 mb-2">
-                            ISBN / Kode Buku
+                            Kode Katalog
                         </label>
 
                         <input name="kode"
@@ -256,6 +256,12 @@
                         @error('kode')
                             <p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>
                         @enderror
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-black text-slate-950 mb-2">ISBN / Barcode Penerbit</label>
+                        <input name="isbn" value="{{ old('isbn', $buku->isbn) }}" class="neo-input w-full px-4 py-3 rounded-xl text-sm" placeholder="Contoh: 9786020000000" type="text">
+                        @error('isbn')<p class="text-rose-600 text-sm font-bold mt-1">{{ $message }}</p>@enderror
                     </div>
 
                     <div>
@@ -276,7 +282,7 @@
 
                     <div>
                         <label class="block text-sm font-black text-slate-950 mb-2">
-                            Jumlah Stok
+                            Eksemplar Tersedia
                         </label>
 
                         <input name="stock"

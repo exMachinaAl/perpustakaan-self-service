@@ -28,7 +28,7 @@ class HomeController extends Controller
             'buku_tersedia' => $bukuTersedia,
         ]);
 
-        return view('home', compact(
+        return view('Home', compact(
             'totalBuku',
             'anggotaAktif',
             'bukuDipinjam',

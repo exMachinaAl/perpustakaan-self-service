@@ -12,6 +12,21 @@
 @else — @endif</td></tr>
 @empty<tr><td colspan="6">Belum ada perangkat terdaftar.</td></tr>@endforelse
 </tbody></table></div></div>
+<div class="card"><h2>Terima Pengembalian Fisik — Pilot</h2>
+<p class="warn">HANYA untuk buku fisik yang sudah diserahkan kepada petugas. Jangan gunakan foto QR sebagai bukti pengembalian. Proses ini mengubah status pinjaman, stok, dan denda melalui LoanWorkflow.</p>
+@if(app()->environment('production'))<p>Dinonaktifkan dalam APP_ENV=production.</p>@else
+<div style="overflow:auto"><table><thead><tr><th>Pinjaman</th><th>Siswa</th><th>Buku fisik</th><th>Jatuh tempo</th><th>Konfirmasi fisik</th></tr></thead><tbody>
+@forelse($returns as $item)
+<tr><td>#{{ $item->loan_id }}</td><td>{{ $item->nama }}</td><td>{{ $item->judul }} / {{ $item->label }}</td><td>{{ $item->due_date }}</td><td>
+<form method="post" action="{{ route('admin.kiosk.pilot.return', $item->loan_id) }}" onsubmit="return confirm('Buku FISIK sudah diterima dan diperiksa? Transaksi pengembalian akan dicatat.');">
+@csrf
+<label style="display:block"><input type="checkbox" name="physical_received" value="1" required> Saya telah menerima dan memeriksa buku fisik</label>
+<input type="text" name="condition" maxlength="255" placeholder="Catatan kondisi (opsional)" style="max-width:280px;padding:8px;margin:6px;color:#101828">
+<button type="submit">Konfirmasi Terima Fisik</button>
+</form></td></tr>
+@empty<tr><td colspan="5">Tidak ada pinjaman pilot aktif yang menunggu pengembalian.</td></tr>@endforelse
+</tbody></table></div>
+@endif</div>
 <div class="card"><h2>Riwayat transaksi pilot</h2><table><thead><tr><th>Perangkat</th><th>ID Pinjaman</th><th>Jatuh tempo</th><th>Waktu</th></tr></thead><tbody>@forelse($checkouts as $c)<tr><td>{{ $c->name }}</td><td>#{{ $c->loan_id }}</td><td>{{ $c->due_date }}</td><td>{{ $c->created_at }}</td></tr>@empty<tr><td colspan="4">Belum ada transaksi pilot.</td></tr>@endforelse</tbody></table></div>
 <p>Untuk pengujian identifikasi normal, biarkan <code>KIOSK_PILOT_CHECKOUT=false</code>. Status QR valid tidak pernah menulis data pinjaman.</p>
 </main></body></html>

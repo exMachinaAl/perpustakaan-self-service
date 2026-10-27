@@ -1,10 +1,26 @@
-# PERPUSTAKAAN RFID + QR — FULL SECURITY BASELINE (20-10-2026)
+# PERPUSTAKAAN SELF-SERVICE — LARAVEL 12
 
 **Kode sesi:** `GPT-0E7760-20261016-736F6E6428`
-**Mode rilis:** SOURCE LENGKAP Laravel 10.50.2 + Blade, MySQL-only, hardening login/role/transaksi/QR, API RFID identifikasi UID.
+**Mode rilis:** Laravel 12.70.1 + Blade, MySQL, peminjaman mandiri QR/barcode, dan API RFID identifikasi UID.
 **Sumber:** `perpustakaan(1).zip` (SHA256: `42b8263f1a48c591ded4758c1b7c775506dd78460548b3d3d916cf2baa303d9c`).
 
-> BACA SEBELUM DIJALANKAN: Source ini lolos *lint* PHP dan audit statis, **BELUM TERUJI secara runtime di server MySQL, Laravel vendor, ESP32, dan reader fisik**. JANGAN langsung mengganti server produksi sebelum uji staging. Laravel 10 sudah melewati masa dukungan keamanan per 2026; migrasi ke Laravel supported major menjadi prioritas sebelum deployment publik.
+> Status 28 Oktober 2026: Laravel 12.70.1, build Vite 8.3.5, audit Composer/npm bersih, dan 21 tes/85 assertion lulus. Scanner fisik, browser kiosk sebenarnya, serta beban multi-kiosk tetap perlu diuji di lokasi sekolah.
+
+## Self-service saat ini
+
+- Anggota otomatis mendapat kartu QR `LIBCARD1`; siswa membuat PIN 6 angka pada menu kartu anggota.
+- Setiap eksemplar otomatis mendapat QR dan kode inventaris unik.
+- Barcode inventaris lama dapat dimasukkan satu per baris saat menambah buku.
+- ISBN disimpan sebagai identitas judul/edisi dan tidak dipakai sebagai identitas tunggal eksemplar.
+- Alur kiosk: kartu anggota → PIN → QR/barcode buku → konfirmasi siswa → pinjaman tercatat.
+- Checkout memakai UUID agar pengiriman ulang tidak membuat transaksi ganda.
+- Decoder kamera `html5-qrcode` tersedia secara lokal di `public/vendor`, sehingga kiosk utama tidak bergantung pada internet/CDN.
+- Admin dapat mengelola barcode, status, cetak, dan penerbitan ulang QR dari **Data Buku -> Detail -> Eksemplar & QR**.
+- Admin dapat mencetak atau menerbitkan ulang kartu dari **Anggota -> Detail -> Cetak Kartu QR**. Penerbitan ulang langsung membatalkan QR lama tanpa mengubah PIN.
+
+Aturan berada di `config/library.php` dan dapat diubah melalui variabel `LIBRARY_*` di environment.
+
+Bagian di bawah mendokumentasikan baseline keamanan dan perangkat yang menjadi dasar versi ini.
 
 ## Ringkasan perubahan
 
@@ -25,7 +41,7 @@
 2. Ekstrak ZIP ini sebagai folder **baru** sejajar dengan folder proyek lama, JANGAN langsung overlay proyek produksi.
 3. Salin file `.env` dari aplikasi lama ke folder full baru, periksa `DB_CONNECTION=mysql`, host, username, password, `APP_URL`, `APP_DEBUG=false`. **Jangan ganti `APP_KEY` jika menggunakan data terenkripsi**. Bila instalasi baru tanpa `.env`, salin `.env.example` lalu jalankan `php artisan key:generate` setelah Composer tersedia.
 4. Periksa ekstensi PHP (`php -m` dan `php --ini`): `pdo_mysql`, `mbstring`, `openssl`, `gd`, `fileinfo`, `zip`, `intl` bila diminta dependensi. Ekstensi mongodb tidak lagi diperlukan untuk proyek ini.
-5. Instal dependensi dari root: `composer install`. Lockfile disediakan dengan dua paket MongoDB dihapus; bila Composer mendeteksi konflik di lingkungan Anda, simpan output error dan perbaiki dependency **di staging**, bukan memakai `--ignore-platform-reqs`.
+5. Instal dependensi dari root: `composer install` lalu `npm ci && npm run build`. Lockfile Composer dan npm disediakan. Bila Composer mendeteksi konflik di lingkungan Anda, simpan output error dan perbaiki dependency **di staging**, bukan memakai `--ignore-platform-reqs`.
 6. Jalankan `php artisan optimize:clear` → `php artisan migrate:status` → `php artisan migrate`. **JANGAN** `migrate:fresh`, karena menghapus data. Migrasi hanya menambah tabel/kolom, tidak memigrasi data log lama otomatis.
 7. Jalankan `php artisan storage:link`. Semua file media dari ZIP lama yang diperoleh sudah dimasukkan ke `storage/app/public`. Jika ada upload di server lama yang tidak tercakup ZIP, copy manual secara aman ke folder ini.
 8. Sebelum mencoba reset password dari UI, set SMTP sekolah di `.env`, misalnya `MAIL_MAILER=smtp`, `MAIL_HOST`, `MAIL_PORT`, `MAIL_USERNAME`, `MAIL_PASSWORD`, `MAIL_FROM_ADDRESS`. `MAIL_MAILER=log` hanya untuk development (tautan reset masuk ke log, bukan ke email pengguna).
@@ -82,12 +98,12 @@ Signature = `hex(HMAC-SHA256(READER_SECRET, canonical_string))`. Body yang dikir
 - QR valid hanya 3 menit dan satu kali; URL eksternal dan ID tebakan ditolak oleh endpoint scan POST.
 - Kartu UID invalid/tidak terdaftar/dicabut ditolak lookup; perangkat tanpa signature atau nonce replay ditolak.
 - Laporan Excel bisa diunduh, CRUD buku/anggota lama berjalan, media dapat dibaca.
-- `php artisan test`: ada feature tests baru memakai SQLite in-memory. **Belum dieksekusi saat pembangunan ZIP** karena `vendor/` dan ekstensi database di lingkungan pembangun tidak tersedia; pengujian concurrency perlu MySQL sungguhan.
+- `php artisan test`: 21 tes dengan 85 assertion lulus pada 28 Oktober 2026; pengujian concurrency tetap perlu MySQL staging dengan beberapa proses.
 
 ## Batasan yang diketahui (jangan anggap siap produksi)
 
-- Laravel 10 tidak lagi mendapat patch keamanan resmi. Upgrade framework adalah pekerjaan penting berikutnya; jangan menjadikan rilis ini bukti kelayakan produksi publik.
-- UI masih memakai Tailwind CDN dan scanner html5-qrcode dari unpkg, sehingga butuh internet, CSP ketat dan bundling aset lokal belum diterapkan.
+- Framework sudah dinaikkan ke Laravel 12. Rencanakan Laravel 13 setelah server menggunakan PHP 8.3 atau lebih baru.
+- Sebagian UI lama masih memakai Tailwind/aset gambar eksternal. Decoder scanner kiosk utama sudah lokal, tetapi seluruh aset UI belum sepenuhnya siap untuk CSP offline yang sangat ketat.
 - Alur `VerifikasiPeminjamanController` adalah kode lama yang **tidak terdaftar pada route aktif**; tidak digunakan oleh integrasi baru.
 - RFID per eksemplar buku / tata letak rak / firmware device belum diimplementasikan. Yang tersedia adalah **kartu anggota** dan API reader (identifikasi UID).
 - Tidak ada bukti testing hardware atau server fisik dari ZIP ini. Wajib uji keamanan, backup, restore, race condition dan integrasi perangkat sebelum penggunaan operasional.

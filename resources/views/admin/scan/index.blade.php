@@ -49,7 +49,7 @@
 
 </div>
 
-<script src="https://unpkg.com/html5-qrcode"></script>
+<script src="{{ asset('vendor/html5-qrcode.min.js') }}"></script>
 
 <script>
 const resultBox=document.getElementById('scanResult');

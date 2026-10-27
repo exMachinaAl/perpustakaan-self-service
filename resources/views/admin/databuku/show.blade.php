@@ -82,6 +82,12 @@
             </div>
 
             <div class="flex flex-wrap justify-start lg:justify-end gap-3 lg:ml-auto lg:pl-10">
+                <a href="{{ route('admin.databuku.inventory.index', $buku) }}"
+                   class="neo-btn inline-flex items-center gap-2 bg-amber-300 text-slate-950 px-4 py-2.5 rounded-xl text-sm font-black">
+                    <span class="material-symbols-outlined text-[18px]">qr_code_2</span>
+                    Eksemplar & QR
+                </a>
+
                 <a href="{{ route('admin.databuku.index') }}"
                    class="neo-btn inline-flex items-center gap-2 bg-white text-slate-950 px-4 py-2.5 rounded-xl text-sm font-black">
                     <span class="material-symbols-outlined text-[18px]">arrow_back</span>

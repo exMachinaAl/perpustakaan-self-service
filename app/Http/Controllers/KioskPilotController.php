@@ -22,8 +22,18 @@ final class KioskPilotController extends Controller
             ->join('library_kiosk_devices as d', 'd.id', '=', 'p.device_id')
             ->orderByDesc('p.id')->select('d.name', 'p.loan_id', 'p.due_date', 'p.created_at')
             ->limit(20)->get();
+        $returns = DB::table('library_kiosk_pilot_checkouts as c')
+            ->join('peminjaman as p', 'p.peminjaman_id', '=', 'c.loan_id')
+            ->join('library_kiosk_book_copies as bc', 'bc.id', '=', 'c.copy_id')
+            ->join('buku as b', 'b.id_buku', '=', 'bc.book_id')
+            ->join('users as u', 'u.id', '=', 'c.member_id')
+            ->leftJoin('library_kiosk_pilot_returns as r', 'r.loan_id', '=', 'c.loan_id')
+            ->whereNull('r.id')->where('p.status', 'dipinjam')
+            ->orderByDesc('c.id')
+            ->limit(100)
+            ->get(['c.loan_id', 'c.due_date', 'b.judul', 'bc.label', 'u.nama']);
         return response()->view('admin.kiosk.pilot', [
-            'devices' => $devices, 'checkouts' => $checkouts, 'pilotEnabled' => $pilot->enabled(),
+            'devices' => $devices, 'checkouts' => $checkouts, 'returns' => $returns, 'pilotEnabled' => $pilot->enabled(),
         ])->header('Cache-Control', 'private, no-store');
     }
 

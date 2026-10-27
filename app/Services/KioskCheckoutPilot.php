@@ -1,4 +1,5 @@
 <?php
+
 namespace App\Services;
 
 use Carbon\Carbon;
@@ -10,27 +11,31 @@ final class KioskCheckoutPilot
 {
     public function enabled(): bool
     {
-        return (bool) config('kiosk_pilot.enabled', false) && !app()->environment('production');
+        return (bool) config('kiosk_pilot.enabled', false) && ! app()->environment('production');
     }
 
     public function approve(int $deviceId, int $adminId): array
     {
-        if (!$this->enabled()) {
+        if (! $this->enabled()) {
             throw new DomainException('Pilot peminjaman tidak diaktifkan. Mode validasi tetap aman.');
         }
 
         return DB::transaction(function () use ($deviceId, $adminId) {
             $device = DB::table('library_kiosk_devices')->where('id', $deviceId)->lockForUpdate()->first();
-            if (!$device || !$device->active) throw new DomainException('Perangkat kiosk tidak aktif.');
+            if (! $device || ! $device->active) {
+                throw new DomainException('Perangkat kiosk tidak aktif.');
+            }
             $session = DB::table('library_kiosk_device_sessions')->where('device_id', $deviceId)
                 ->lockForUpdate()->first();
-            if (!$session) throw new DomainException('Belum ada sesi scan pada perangkat.');
+            if (! $session) {
+                throw new DomainException('Belum ada sesi scan pada perangkat.');
+            }
             if ($session->state === 'borrowed' && $session->checkout_loan_id) {
                 return ['loan_id' => (int) $session->checkout_loan_id, 'already_done' => true,
                     'due_date' => $session->checkout_due_date];
             }
-            if ($session->state !== 'validated' || !$session->member_id || !$session->copy_id
-                || !$session->validated_event_id || !$session->expires_at
+            if ($session->state !== 'validated' || ! $session->member_id || ! $session->copy_id
+                || ! $session->validated_event_id || ! $session->expires_at
                 || Carbon::parse($session->expires_at)->isPast()) {
                 throw new DomainException('Sesi tidak valid atau kedaluwarsa. Minta siswa scan ulang.');
             }
@@ -38,12 +43,16 @@ final class KioskCheckoutPilot
                 throw new DomainException('Scan ini sudah diproses. Reset sesi bila ingin meminjam buku lain.');
             }
             // All checkout paths must serialize on the catalogue row; LoanWorkflow locks the same row.
-            $copy = DB::table('library_kiosk_book_copies')->where('id', $session->copy_id)->where('active', 1)->first();
-            if (!$copy) throw new DomainException('Eksemplar tidak aktif.');
-            $book = DB::table('buku')->where('id_buku', $copy->book_id)->lockForUpdate()->first();
             $member = DB::table('users')->where('id', $session->member_id)
-                ->where('role', 'user')->where('status', 'aktif')->first();
-            if (!$book || !$member || (int) $book->stock <= 0) {
+                ->where('role', 'user')->where('status', 'aktif')->lockForUpdate()->first();
+            $copyLookup = DB::table('library_kiosk_book_copies')->where('id', $session->copy_id)->first();
+            if (! $copyLookup) {
+                throw new DomainException('Eksemplar tidak aktif.');
+            }
+            $book = DB::table('buku')->where('id_buku', $copyLookup->book_id)->lockForUpdate()->first();
+            $copy = DB::table('library_kiosk_book_copies')->where('id', $session->copy_id)
+                ->where('active', 1)->lockForUpdate()->first();
+            if (! $copy || $copy->status !== 'available' || ! $book || ! $member || (int) $book->stock <= 0) {
                 throw new DomainException('Anggota atau stok buku tidak tersedia.');
             }
             $active = DB::table('peminjaman')->where('user_id', $member->id)
@@ -69,6 +78,10 @@ final class KioskCheckoutPilot
             // Use the existing workflow to decrement stock only once, in the same MySQL transaction.
             $workflow = app(LoanWorkflow::class);
             $loan = $workflow->request((int) $member->id, (int) $book->id_buku);
+            $loan->copy_id = $copy->id;
+            $loan->kiosk_device_id = $deviceId;
+            $loan->source = 'staff_pilot';
+            $loan->save();
             $loan = $workflow->apply((int) $loan->peminjaman_id, 'dipinjam');
             $due = Carbon::parse($loan->tanggal_pinjam)->addDays((int) config('kiosk_pilot.loan_days', 7))->toDateString();
             DB::table('library_kiosk_checkout_audit')->insert([
@@ -85,6 +98,7 @@ final class KioskCheckoutPilot
                 'checkout_due_date' => $due, 'expires_at' => now()->addSeconds(20),
                 'updated_at' => now(),
             ]);
+
             return ['loan_id' => (int) $loan->peminjaman_id, 'already_done' => false, 'due_date' => $due];
         }, 3);
     }

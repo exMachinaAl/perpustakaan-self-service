@@ -22,6 +22,12 @@
             </div>
 
             <div class="flex flex-wrap gap-2">
+                <a href="{{ route('admin.anggota.card', $anggota->id) }}" target="_blank" rel="noopener"
+                   class="inline-flex items-center justify-center gap-2 bg-amber-300 text-[#001e40] border border-amber-400 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-amber-200 transition-all">
+                    <span class="material-symbols-outlined text-[20px]">badge</span>
+                    Cetak Kartu QR
+                </a>
+
                 <a href="{{ route('admin.anggota.index') }}"
                    class="inline-flex items-center justify-center gap-2 border border-gray-200 text-gray-600 px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-gray-50 transition-all">
                     <span class="material-symbols-outlined text-[20px]">arrow_back</span>
